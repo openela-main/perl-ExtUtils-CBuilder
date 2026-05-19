@@ -3,7 +3,7 @@ Name:           perl-ExtUtils-CBuilder
 Epoch:          1
 # Mimic perl.spec
 Version:        0.280236
-Release:        4%{?dist}
+Release:        5%{?dist}
 Summary:        Compile and link C code for Perl modules
 License:        GPL+ or Artistic
 URL:            https://metacpan.org/release/ExtUtils-CBuilder
@@ -85,17 +85,24 @@ perl Makefile.PL INSTALLDIRS=vendor NO_PACKLIST=1 NO_PERLLOCAL=1
 
 %install
 %{make_install}
+%{_fixperms} %{buildroot}/*
 
 # Install tests
 mkdir -p %{buildroot}/%{_libexecdir}/%{name}
 cp -a t %{buildroot}/%{_libexecdir}/%{name}
 cat > %{buildroot}/%{_libexecdir}/%{name}/test << 'EOF'
-#!/bin/sh
-cd %{_libexecdir}/%{name} && exec prove -I . -j "$(getconf _NPROCESSORS_ONLN)"
+#!/bin/bash
+set -e
+# Tests write into temporary files/directories. The solution is to copy the
+# tests into a writable directory and execute them from there.
+DIR=$(mktemp -d)
+pushd "$DIR"
+cp -a %{_libexecdir}/%{name}/* ./
+prove -I . -j "$(getconf _NPROCESSORS_ONLN)"
+popd
+rm -rf "$DIR"
 EOF
 chmod +x %{buildroot}/%{_libexecdir}/%{name}/test
-
-%{_fixperms} $RPM_BUILD_ROOT/*
 
 %check
 make test
@@ -103,13 +110,16 @@ make test
 %files
 %license LICENSE
 %doc Changes CONTRIBUTING README README.mkdn
-%{perl_vendorlib}/*
-%{_mandir}/man3/*
+%{perl_vendorlib}/ExtUtils*
+%{_mandir}/man3/ExtUtils::CBuilder*
 
 %files tests
 %{_libexecdir}/%{name}
 
 %changelog
+* Fri Nov 28 2025 Jitka Plesnikova <jplesnik@redhat.com> - 1:0.280236-5
+- Resolves: RHEL-131157 - Update tests for Image Mode
+
 * Mon Aug 09 2021 Mohan Boddu <mboddu@redhat.com> - 1:0.280236-4
 - Rebuilt for IMA sigs, glibc 2.34, aarch64 flags
   Related: rhbz#1991688
